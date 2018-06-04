@@ -1,6 +1,7 @@
 ROLLBACK;
 
 DROP TABLE IF EXISTS sign_a_bond;
+DROP FUNCTION IF EXISTS signing;
 DROP TABLE IF EXISTS services_of_companies;
 DROP TABLE IF EXISTS ins_bonds;
 DROP TABLE IF EXISTS ins_services;
@@ -66,8 +67,23 @@ CREATE TABLE sign_a_bond (
 	FOREIGN KEY (car_id) REFERENCES cars(id) ON DELETE RESTRICT,
 	FOREIGN KEY (company_id) REFERENCES ins_companies(id) ON DELETE RESTRICT,
 	FOREIGN KEY (service_id) REFERENCES ins_services(id) ON DELETE RESTRICT,
-	FOREIGN KEY (bond_id) REFERENCES ins_bonds(id) ON DELETE CASCADE
+	FOREIGN KEY (bond_id) REFERENCES ins_bonds(id) ON DELETE RESTRICT
 );
+
+CREATE FUNCTION signing() RETURNS trigger AS $signing$
+    BEGIN
+        IF (SELECT salary FROM users WHERE id = NEW.user_id) < (SELECT min_salary FROM ins_services WHERE id = NEW.service_id) THEN
+            RAISE EXCEPTION 'You have no money for this service';
+        END IF;
+		INSERT INTO ins_bonds (issued_date) VALUES
+			(2018);
+		NEW.bond_id = (SELECT currval('ins_bonds_id_seq'));
+        RETURN NEW;
+    END;
+$signing$ LANGUAGE plpgsql;
+
+CREATE TRIGGER signing BEFORE INSERT OR UPDATE ON sign_a_bond
+    FOR EACH ROW EXECUTE PROCEDURE signing();
 
 --Add new user
 BEGIN;
@@ -170,7 +186,7 @@ COMMIT;
 BEGIN;
 SELECT issuer, service_name, min_salary, length FROM ins_services
 	JOIN ins_companies ON ins_services.issuer = ins_companies.company_name
-	WHERE issuer ILIKE '%insure%';
+	WHERE issuer ILIKE '%insure%'
 	ORDER BY issuer;
 COMMIT;
 
@@ -181,7 +197,8 @@ COMMIT;
 
 --Insure car
 BEGIN;
-
+INSERT INTO sign_a_bond (user_id, car_id, company_id, service_id) VALUES
+	(3, 2, 2, 3);
 COMMIT;
 
 --Lengthen insurance bond
